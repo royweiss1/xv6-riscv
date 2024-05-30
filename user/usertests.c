@@ -709,7 +709,7 @@ exectest(char *s)
     printf("%s: wait failed!\n", s);
   }
   if(xstatus != 0)
-    exit(xstatus);
+    exit(xstatus,0);
 
   fd = open("echo-ok", O_RDONLY);
   if(fd < 0) {
@@ -778,7 +778,7 @@ pipe1(char *s)
     }
     close(fds[0]);
     wait(&xstatus);
-    exit(xstatus);
+    exit(xstatus,0);
   } else {
     printf("%s: fork() failed\n", s);
     exit(1, 0);
@@ -1082,7 +1082,7 @@ mem(char *s)
       // so OK.
       exit(0, 0);
     }
-    exit(xstatus);
+    exit(xstatus,0);
   }
 }
 
@@ -1117,7 +1117,7 @@ sharedfd(char *s)
     int xstatus;
     wait(&xstatus);
     if(xstatus != 0)
-      exit(xstatus);
+      exit(xstatus,0);
   }
   
   close(fd);
@@ -1187,7 +1187,7 @@ fourfiles(char *s)
   for(pi = 0; pi < NCHILD; pi++){
     wait(&xstatus);
     if(xstatus != 0)
-      exit(xstatus);
+      exit(xstatus,0);
   }
 
   for(i = 0; i < NCHILD; i++){
@@ -2054,7 +2054,7 @@ sbrkbasic(char *s)
   if(pid == 0)
     exit(0, 0);
   wait(&xstatus);
-  exit(xstatus);
+  exit(xstatus,0);
 }
 
 void
@@ -2321,7 +2321,7 @@ bigargtest(char *s)
   
   wait(&xstatus);
   if(xstatus != 0)
-    exit(xstatus);
+    exit(xstatus,0);
   fd = open("bigarg-ok", 0);
   if(fd < 0){
     printf("%s: bigarg test failed!\n", s);
@@ -2418,7 +2418,7 @@ stacktest(char *s)
   if(xstatus == -1)  // kernel killed child?
     exit(0, 0);
   else
-    exit(xstatus);
+    exit(xstatus,0);
 }
 
 // check that writes to text segment fault
@@ -2441,7 +2441,7 @@ textwrite(char *s)
   if(xstatus == -1)  // kernel killed child?
     exit(0, 0);
   else
-    exit(xstatus);
+    exit(xstatus,0);
 }
 
 // regression test. copyin(), copyout(), and copyinstr() used to cast

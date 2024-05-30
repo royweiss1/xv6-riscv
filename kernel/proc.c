@@ -55,6 +55,8 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      p->affinity_mask = 0;
+      p->effective_afinity_mask = 0;
   }
 }
 
@@ -145,6 +147,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  p->affinity_mask = 0;
+  p->effective_afinity_mask = 0;
+
 
   return p;
 }
@@ -169,6 +174,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->affinity_mask = 0;
+  p->effective_afinity_mask = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -320,6 +327,8 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  np->affinity_mask = p->affinity_mask; // inherit affinity mask from parent
+  np->effective_afinity_mask = p->effective_afinity_mask; // inherit effective affinity mask from parent
   release(&np->lock);
 
   return pid;
@@ -456,13 +465,23 @@ scheduler(void)
 
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state == RUNNABLE && (p->affinity_mask==0 || p->effective_afinity_mask & (1 << cpuid()))) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        printf("procces id %d is running on cpu %d\n",p->pid,cpuid());
         swtch(&c->context, &p->context);
+        // update effective affinity mask
+        p->effective_afinity_mask  = p->effective_afinity_mask & ~(1 << cpuid());
+        if(p->effective_afinity_mask == 0){
+          p->effective_afinity_mask = p->affinity_mask & ~(1 << cpuid());
+          //NOTE: this is an edge case where only one cpu is allowed:
+          if(p->effective_afinity_mask == 0){
+            p->effective_afinity_mask = p->affinity_mask;
+          }
+        }
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -496,6 +515,14 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
+  // cid = cpuid();
+  // new_effective_affinity_mask = p->effective_afinity_mask & ~(1 << cid);
+  // // printf("current effective affinity mask %d\n",p->effective_afinity_mask);
+  // // printf("new effective affinity mask %d\n",new_effective_affinity_mask);
+  // proc->effective_afinity_mask  = new_effective_affinity_mask;
+  // if(p->effective_afinity_mask == 0){
+  //   p->effective_afinity_mask = p->affinity_mask;
+  // }
   swtch(&p->context, &mycpu()->context);
   mycpu()->intena = intena;
 }
@@ -504,9 +531,19 @@ sched(void)
 void
 yield(void)
 {
+
+  // int cid;
+  // int new_effective_affinity_mask;
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+
+  // cid = cpuid();
+  // new_effective_affinity_mask = p->effective_afinity_mask & ~(1 << cid);
+  // myproc()->effective_afinity_mask  = new_effective_affinity_mask;
+  // if(p->effective_afinity_mask == 0){
+  //   p->effective_afinity_mask = p->affinity_mask;
+  // }
   sched();
   release(&p->lock);
 }
